@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recommendation Systems Workshop</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .spinner-border {
+            animation: spinner-border 0.75s linear infinite;
+        }
+
+        @keyframes spinner-border {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app"></div>
+
+    <script type="module">
+        const { useState, useEffect } = React;
+
+        const App = () => {
+            const [theme, setTheme] = useState('light');
+            const [apiUrl, setApiUrl] = useState('https://dmml-recsys.dapagyi.dedyn.io');
+            const [customApiUrl, setCustomApiUrl] = useState('');
+            const [showApiInput, setShowApiInput] = useState(false);
+            const [loading, setLoading] = useState(true);
+            const [preprocessing, setPreprocessing] = useState(false);
+            const [apiInfo, setApiInfo] = useState(null);
+            const [movies, setMovies] = useState([]);
+            const [selectedType, setSelectedType] = useState('item');
+            const [selectedAlgorithm, setSelectedAlgorithm] = useState('');
+
+            const [selectedMovie, setSelectedMovie] = useState('');
+            const [topN, setTopN] = useState(10);
+
+            const [ratings, setRatings] = useState([]);
+            const [ratingMovie, setRatingMovie] = useState('');
+            const [ratingValue, setRatingValue] = useState(5);
+
+            const [recommendations, setRecommendations] = useState([]);
+            const [error, setError] = useState(null);
+
+            useEffect(() => {
+                const savedTheme = localStorage.getItem('theme') || 'light';
+                const savedApiUrl = localStorage.getItem('apiUrl');
+
+                setTheme(savedTheme);
+                document.documentElement.setAttribute('data-bs-theme', savedTheme);
+
+                if (savedApiUrl) {
+                    setApiUrl(savedApiUrl);
+                    setCustomApiUrl(savedApiUrl);
+                }
+
+                initializeApi(savedApiUrl || apiUrl);
+            }, []);
+
+            const initializeApi = async (url) => {
+                setLoading(true);
+                setError(null);
+
+                try {
+                    const response = await fetch(`${url}/api/init`, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' },
+                        // ignore CORS for local testing
+                        mode: 'no-cors'
+                    });
+
+                    if (!response.ok) throw new Error('Failed to connect to API');
+
+                    const data = await response.json();
+                    console.log('API Info:', data);
+                    setApiInfo(data);
+
+                    const moviesUrl = data.dataset_url.startsWith('http')
+                        ? data.dataset_url
+                        : `${url}${data.dataset_url}`;
+
+                    const moviesResponse = await fetch(moviesUrl);
+                    const moviesData = await moviesResponse.json();
+                    setMovies(moviesData);
+
+                    if (data.algorithms.item?.length > 0) {
+                        setSelectedAlgorithm(data.algorithms.item[0].id);
+                    }
+
+                    setLoading(false);
+                } catch (err) {
+                    setError(err.message);
+                    setLoading(false);
+                }
+            };
+
+            const toggleTheme = () => {
+                const newTheme = theme === 'light' ? 'dark' : 'light';
+                setTheme(newTheme);
+                localStorage.setItem('theme', newTheme);
+                document.documentElement.setAttribute('data-bs-theme', newTheme);
+            };
+
+            const handleApiChange = () => {
+                if (customApiUrl) {
+                    setApiUrl(customApiUrl);
+                    localStorage.setItem('apiUrl', customApiUrl);
+                    initializeApi(customApiUrl);
+                }
+                setShowApiInput(false);
+            };
+
+            const handleTypeChange = (type) => {
+                setSelectedType(type);
+                setRecommendations([]);
+                setError(null);
+
+                const algorithms = apiInfo.algorithms[type];
+                if (algorithms?.length > 0) {
+                    setSelectedAlgorithm(algorithms[0].id);
+                }
+            };
+
+            const addRating = () => {
+                if (ratingMovie && !ratings.find(r => r.movie === ratingMovie)) {
+                    setRatings([...ratings, { movie: ratingMovie, rating: ratingValue }]);
+                    setRatingMovie('');
+                    setRatingValue(5);
+                }
+            };
+
+            const removeRating = (movie) => {
+                setRatings(ratings.filter(r => r.movie !== movie));
+            };
+
+            const getRecommendations = async () => {
+                setError(null);
+                setRecommendations([]);
+                setPreprocessing(true);
+
+                try {
+                    const algorithm = apiInfo.algorithms[selectedType].find(a => a.id === selectedAlgorithm);
+
+                    let body;
+                    if (selectedType === 'item') {
+                        body = JSON.stringify({
+                            item_id: selectedMovie,
+                            top_n: topN
+                        });
+                    } else {
+                        body = JSON.stringify({
+                            ratings: ratings.map(r => ({
+                                item_id: r.movie,
+                                rating: r.rating
+                            })),
+                            top_n: topN
+                        });
+                    }
+
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    const response = await fetch(`${apiUrl}${algorithm.endpoint}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: body
+                    });
+
+                    if (!response.ok) throw new Error('Failed to get recommendations');
+
+                    const data = await response.json();
+                    setRecommendations(data.recommendations);
+                    setPreprocessing(false);
+                } catch (err) {
+                    setError(err.message);
+                    setPreprocessing(false);
+                }
+            };
+
+            const getMovieTitle = (movieId) => {
+                const movie = movies.find(m => m.movieId === movieId);
+                return movie ? `${movie.title} (${movie.year || 'N/A'})` : movieId;
+            };
+
+            const isDefaultApi = apiUrl === 'https://dmml-recsys.dapagyi.dedyn.io';
+
+            if (loading) {
+                return React.createElement('div', { className: 'min-vh-100 d-flex align-items-center justify-content-center' },
+                    React.createElement('div', { className: 'text-center' },
+                        React.createElement('div', { className: 'spinner-border', role: 'status', style: { width: '3rem', height: '3rem' } },
+                            React.createElement('span', { className: 'visually-hidden' }, 'Loading...')
+                        ),
+                        React.createElement('p', { className: 'mt-3 text-muted' }, 'Connecting to API and loading data...')
+                    )
+                );
+            }
+
+            return React.createElement('div', { className: 'min-vh-100 py-4' },
+                React.createElement('div', { className: 'container' },
+                    React.createElement('div', { className: 'd-flex justify-content-between align-items-center mb-4' },
+                        React.createElement('h1', { className: 'mb-0' }, 'Recommendation Systems Workshop'),
+                        React.createElement('div', { className: 'd-flex gap-2' },
+                            React.createElement('button', { className: 'btn btn-outline-secondary', onClick: toggleTheme },
+                                theme === 'light' ? '🌙' : '☀️'
+                            ),
+                            React.createElement('button', { className: 'btn btn-outline-secondary', onClick: () => setShowApiInput(!showApiInput) },
+                                '⚙️'
+                            )
+                        )
+                    ),
+
+                    React.createElement('div', { className: 'card mb-4' },
+                        React.createElement('div', { className: 'card-body' },
+                            React.createElement('div', { className: 'd-flex align-items-center justify-content-between' },
+                                React.createElement('div', null,
+                                    React.createElement('small', { className: 'text-muted' }, 'Current API:'),
+                                    React.createElement('div', { className: 'fw-semibold' },
+                                        isDefaultApi ? 'Default API' : apiUrl
+                                    )
+                                ),
+                                showApiInput && React.createElement('div', { className: 'd-flex gap-2 flex-grow-1 ms-3' },
+                                    React.createElement('input', {
+                                        type: 'text',
+                                        className: 'form-control',
+                                        placeholder: 'Enter API URL (e.g., http://localhost:8000)',
+                                        value: customApiUrl,
+                                        onChange: (e) => setCustomApiUrl(e.target.value)
+                                    }),
+                                    React.createElement('button', { className: 'btn btn-primary', onClick: handleApiChange }, 'Update')
+                                )
+                            )
+                        )
+                    ),
+
+                    error && React.createElement('div', { className: 'alert alert-danger', role: 'alert' }, error),
+
+                    React.createElement('div', { className: 'card mb-4' },
+                        React.createElement('div', { className: 'card-body' },
+                            React.createElement('h5', { className: 'card-title' }, 'Recommendation Mode'),
+                            React.createElement('div', { className: 'btn-group w-100', role: 'group' },
+                                React.createElement('button', {
+                                    className: `btn btn-outline-primary ${selectedType === 'item' ? 'active' : ''}`,
+                                    onClick: () => handleTypeChange('item')
+                                }, 'Item-Based (Similar Items)'),
+                                React.createElement('button', {
+                                    className: `btn btn-outline-primary ${selectedType === 'rating' ? 'active' : ''}`,
+                                    onClick: () => handleTypeChange('rating')
+                                }, 'Rating-Based (Personalized)')
+                            )
+                        )
+                    ),
+
+                    React.createElement('div', { className: 'card mb-4' },
+                        React.createElement('div', { className: 'card-body' },
+                            React.createElement('h5', { className: 'card-title' }, 'Algorithm'),
+                            React.createElement('select', {
+                                className: 'form-select',
+                                value: selectedAlgorithm,
+                                onChange: (e) => setSelectedAlgorithm(e.target.value)
+                            },
+                                apiInfo?.algorithms[selectedType]?.map(algo =>
+                                    React.createElement('option', { key: algo.id, value: algo.id }, algo.name)
+                                )
+                            ),
+                            apiInfo?.algorithms[selectedType]?.find(a => a.id === selectedAlgorithm)?.description &&
+                            React.createElement('small', { className: 'text-muted d-block mt-2' },
+                                apiInfo.algorithms[selectedType].find(a => a.id === selectedAlgorithm).description
+                            )
+                        )
+                    ),
+
+                    React.createElement('div', { className: 'card mb-4' },
+                        React.createElement('div', { className: 'card-body' },
+                            React.createElement('h5', { className: 'card-title' }, 'Input'),
+
+                            selectedType === 'item'
+                                ? React.createElement('div', null,
+                                    React.createElement('div', { className: 'mb-3' },
+                                        React.createElement('label', { className: 'form-label' }, 'Select a movie:'),
+                                        React.createElement('select', {
+                                            className: 'form-select',
+                                            value: selectedMovie,
+                                            onChange: (e) => setSelectedMovie(e.target.value)
+                                        },
+                                            React.createElement('option', { value: '' }, 'Choose a movie...'),
+                                            movies.map(movie =>
+                                                React.createElement('option', { key: movie.movieId, value: movie.movieId },
+                                                    `${movie.title} (${movie.year || 'N/A'})`
+                                                )
+                                            )
+                                        )
+                                    ),
+                                    React.createElement('div', { className: 'mb-3' },
+                                        React.createElement('label', { className: 'form-label' }, 'Number of recommendations:'),
+                                        React.createElement('input', {
+                                            type: 'number',
+                                            className: 'form-control',
+                                            min: '1',
+                                            max: '50',
+                                            value: topN,
+                                            onChange: (e) => setTopN(parseInt(e.target.value))
+                                        })
+                                    )
+                                )
+                                : React.createElement('div', null,
+                                    React.createElement('div', { className: 'mb-3' },
+                                        React.createElement('label', { className: 'form-label' }, 'Add ratings:'),
+                                        React.createElement('div', { className: 'd-flex gap-2 mb-2' },
+                                            React.createElement('select', {
+                                                className: 'form-select',
+                                                value: ratingMovie,
+                                                onChange: (e) => setRatingMovie(e.target.value)
+                                            },
+                                                React.createElement('option', { value: '' }, 'Choose a movie...'),
+                                                movies.map(movie =>
+                                                    React.createElement('option', { key: movie.movieId, value: movie.movieId },
+                                                        `${movie.title} (${movie.year || 'N/A'})`
+                                                    )
+                                                )
+                                            ),
+                                            React.createElement('input', {
+                                                type: 'number',
+                                                className: 'form-control',
+                                                style: { maxWidth: '100px' },
+                                                min: '1',
+                                                max: '5',
+                                                step: '0.5',
+                                                value: ratingValue,
+                                                onChange: (e) => setRatingValue(parseFloat(e.target.value))
+                                            }),
+                                            React.createElement('button', { className: 'btn btn-primary', onClick: addRating }, 'Add')
+                                        )
+                                    ),
+
+                                    ratings.length > 0 && React.createElement('div', { className: 'mb-3' },
+                                        React.createElement('label', { className: 'form-label' }, 'Your ratings:'),
+                                        React.createElement('div', { className: 'list-group' },
+                                            ratings.map(r =>
+                                                React.createElement('div', { key: r.movie, className: 'list-group-item d-flex justify-content-between align-items-center' },
+                                                    React.createElement('span', null, getMovieTitle(r.movie)),
+                                                    React.createElement('div', { className: 'd-flex align-items-center gap-2' },
+                                                        React.createElement('span', { className: 'badge bg-primary' }, `${r.rating} ★`),
+                                                        React.createElement('button', {
+                                                            className: 'btn btn-sm btn-outline-danger',
+                                                            onClick: () => removeRating(r.movie)
+                                                        }, 'Remove')
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    ),
+
+                                    React.createElement('div', { className: 'mb-3' },
+                                        React.createElement('label', { className: 'form-label' }, 'Number of recommendations:'),
+                                        React.createElement('input', {
+                                            type: 'number',
+                                            className: 'form-control',
+                                            min: '1',
+                                            max: '50',
+                                            value: topN,
+                                            onChange: (e) => setTopN(parseInt(e.target.value))
+                                        })
+                                    )
+                                ),
+
+                            React.createElement('button', {
+                                className: 'btn btn-success w-100',
+                                onClick: getRecommendations,
+                                disabled: preprocessing || (selectedType === 'item' ? !selectedMovie : ratings.length === 0)
+                            },
+                                preprocessing
+                                    ? React.createElement('span', null,
+                                        React.createElement('span', { className: 'spinner-border spinner-border-sm me-2', role: 'status' }),
+                                        'Processing...'
+                                    )
+                                    : 'Get Recommendations'
+                            )
+                        )
+                    ),
+
+                    recommendations.length > 0 && React.createElement('div', { className: 'card' },
+                        React.createElement('div', { className: 'card-body' },
+                            React.createElement('h5', { className: 'card-title' }, 'Recommendations'),
+                            React.createElement('div', { className: 'list-group' },
+                                recommendations.map((rec, idx) =>
+                                    React.createElement('div', { key: idx, className: 'list-group-item d-flex justify-content-between align-items-center' },
+                                        React.createElement('div', null,
+                                            React.createElement('span', { className: 'badge bg-secondary me-2' }, idx + 1),
+                                            getMovieTitle(rec.item_id)
+                                        ),
+                                        React.createElement('span', { className: 'badge bg-primary rounded-pill' },
+                                            `Score: ${rec.score.toFixed(3)}`
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            );
+        };
+
+        ReactDOM.render(React.createElement(App), document.getElementById('app'));
+    </script>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+</body>
+
+</html>
