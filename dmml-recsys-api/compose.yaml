@@ -1,0 +1,13 @@
+services:
+  dmml:
+    build: .
+    container_name: dmml
+    volumes:
+      - /etc/localtime:/etc/localtime
+    networks:
+      - caddy_network
+    restart: unless-stopped
+
+networks:
+  caddy_network:
+    external: true

@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 import pandas as pd
 from pathlib import Path
 import re
-from recommenders import (
+from src.recommenders import (
     ContentBasedRecommender,
     TagBasedRecommender,
     ItemBasedCF,
@@ -13,7 +13,7 @@ from recommenders import (
     PopularityRecommender,
 )
 
-from models import (
+from src.models import (
     ItemRecommendationRequest,
     RatingRecommendationRequest,
     RecommendationResponse,

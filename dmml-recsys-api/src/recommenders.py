@@ -5,7 +5,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from collections import defaultdict
 
-from models import RecommendationOutput, RatingInput
+from src.models import RecommendationOutput, RatingInput
 
 class ContentBasedRecommender:
     """TF-IDF based content recommendation using title and genres"""
