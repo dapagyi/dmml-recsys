@@ -1,7 +1,7 @@
 services:
   dmml:
     build: .
-    container_name: dmml
+    container_name: dmml-recsys
     volumes:
       - /etc/localtime:/etc/localtime
     networks:
