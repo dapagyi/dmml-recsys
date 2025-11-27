@@ -4,10 +4,10 @@ from litestar.datastructures import State
 from typing import List, Dict, Any
 from src.recommenders import (
     ContentBasedRecommender,
-    TagBasedRecommender,
-    ItemBasedCF,
-    UserBasedCF,
-    PopularityRecommender,
+    # TagBasedRecommender,
+    # ItemBasedCF,
+    # UserBasedCF,
+    # PopularityRecommender,
 )
 
 from src.models import (
@@ -17,6 +17,7 @@ from src.models import (
     InitResponse,
 )
 from src.utils import load_data
+
 
 def initialize_recommenders(app: Litestar) -> None:
     """Initialize all recommender systems"""
@@ -28,17 +29,17 @@ def initialize_recommenders(app: Litestar) -> None:
     print("Initializing Content-Based Recommender...")
     app.state.content_based = ContentBasedRecommender(movies_df)
 
-    print("Initializing Tag-Based Recommender...")
-    app.state.tag_based = TagBasedRecommender(movies_df)
+    # print("Initializing Tag-Based Recommender...")
+    # app.state.tag_based = TagBasedRecommender(movies_df)
 
-    print("Initializing Item-Based CF...")
-    app.state.item_based_cf = ItemBasedCF(ratings_df)
+    # print("Initializing Item-Based CF...")
+    # app.state.item_based_cf = ItemBasedCF(ratings_df)
 
-    print("Initializing User-Based CF...")
-    app.state.user_based_cf = UserBasedCF(ratings_df)
+    # print("Initializing User-Based CF...")
+    # app.state.user_based_cf = UserBasedCF(ratings_df)
 
-    print("Initializing Popularity Recommender...")
-    app.state.popularity = PopularityRecommender(ratings_df)
+    # print("Initializing Popularity Recommender...")
+    # app.state.popularity = PopularityRecommender(ratings_df)
 
     print("All recommenders initialized!")
 
@@ -56,32 +57,32 @@ async def init_endpoint(state: State) -> InitResponse:
                     "endpoint": "/api/recommend/item/content",
                     "description": "Recommends items similar in content (genres, title) using TF-IDF and cosine similarity",
                 },
-                {
-                    "id": "tag_based",
-                    "name": "Tag-Based (User Tags)",
-                    "endpoint": "/api/recommend/item/tags",
-                    "description": "Recommends items based on user-generated tags describing the movie content",
-                },
-                {
-                    "id": "item_cf",
-                    "name": "Item-Based Collaborative Filtering",
-                    "endpoint": "/api/recommend/item/cf",
-                    "description": "Recommends items that users who liked this item also liked",
-                },
+                # {
+                #     "id": "tag_based",
+                #     "name": "Tag-Based (User Tags)",
+                #     "endpoint": "/api/recommend/item/tags",
+                #     "description": "Recommends items based on user-generated tags describing the movie content",
+                # },
+                # {
+                #     "id": "item_cf",
+                #     "name": "Item-Based Collaborative Filtering",
+                #     "endpoint": "/api/recommend/item/cf",
+                #     "description": "Recommends items that users who liked this item also liked",
+                # },
             ],
             "rating": [
-                {
-                    "id": "user_cf",
-                    "name": "User-Based Collaborative Filtering",
-                    "endpoint": "/api/recommend/rating/cf",
-                    "description": "Recommends items based on similar users' preferences",
-                },
-                {
-                    "id": "popularity",
-                    "name": "Popularity-Based",
-                    "endpoint": "/api/recommend/rating/popularity",
-                    "description": "Recommends popular items (excluding already rated)",
-                },
+                # {
+                #     "id": "user_cf",
+                #     "name": "User-Based Collaborative Filtering",
+                #     "endpoint": "/api/recommend/rating/cf",
+                #     "description": "Recommends items based on similar users' preferences",
+                # },
+                # {
+                #     "id": "popularity",
+                #     "name": "Popularity-Based",
+                #     "endpoint": "/api/recommend/rating/popularity",
+                #     "description": "Recommends popular items (excluding already rated)",
+                # },
             ],
         },
     )
